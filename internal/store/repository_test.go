@@ -16,7 +16,7 @@ func setupTestDB(t *testing.T) (*sql.DB, *Repository) {
 		t.Fatal(err)
 	}
 	tempFile.Close()
-	
+
 	t.Cleanup(func() {
 		os.Remove(tempFile.Name())
 	})
@@ -34,7 +34,7 @@ func setupTestDB(t *testing.T) (*sql.DB, *Repository) {
 }
 
 func setupTestEncryption(t *testing.T) {
-	testKey := "dGVzdGtleTEyMzQ1Njc4OTBhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5ej0="
+	testKey := "ZhRwyRc6+ScRvBqVGiiwRiIiahXh503NTHT7E2p/3WQ="
 	os.Setenv("APP_ENC_KEY", testKey)
 	t.Cleanup(func() {
 		os.Unsetenv("APP_ENC_KEY")

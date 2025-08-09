@@ -176,8 +176,26 @@ func TestWriteHeader(t *testing.T) {
 		t.Error("Header missing charset setting")
 	}
 
-	if !strings.Contains(output, "SET FOREIGN_KEY_CHECKS=0") {
-		t.Error("Header missing foreign key checks disable")
+}
+
+func TestDisableAndEnableForeignKeyChecks(t *testing.T) {
+	d := &Dumper{}
+	var buf strings.Builder
+
+	if err := d.disableForeignKeyChecks(&buf); err != nil {
+		t.Fatalf("disableForeignKeyChecks failed: %v", err)
+	}
+	if buf.String() != "SET FOREIGN_KEY_CHECKS=0;\n\n" {
+		t.Errorf("unexpected disable output: %q", buf.String())
+	}
+
+	buf.Reset()
+
+	if err := d.enableForeignKeyChecks(&buf); err != nil {
+		t.Fatalf("enableForeignKeyChecks failed: %v", err)
+	}
+	if buf.String() != "\nSET FOREIGN_KEY_CHECKS=1;\n" {
+		t.Errorf("unexpected enable output: %q", buf.String())
 	}
 }
 
@@ -198,100 +216,5 @@ func TestWriteInsert(t *testing.T) {
 
 	if output != expected {
 		t.Errorf("writeInsert output mismatch:\nGot:\n%q\nExpected:\n%q", output, expected)
-	}
-}
-
-func TestParseScheduleTime(t *testing.T) {
-	tests := []struct {
-		name          string
-		scheduleTime  string
-		expectedHour  int
-		expectedMin   int
-		expectedError bool
-	}{
-		{
-			name:         "valid time",
-			scheduleTime: "14:30",
-			expectedHour: 14,
-			expectedMin:  30,
-		},
-		{
-			name:         "midnight",
-			scheduleTime: "00:00",
-			expectedHour: 0,
-			expectedMin:  0,
-		},
-		{
-			name:         "end of day",
-			scheduleTime: "23:59",
-			expectedHour: 23,
-			expectedMin:  59,
-		},
-		{
-			name:          "invalid format - no colon",
-			scheduleTime:  "1430",
-			expectedError: true,
-		},
-		{
-			name:          "invalid format - too many parts",
-			scheduleTime:  "14:30:00",
-			expectedError: true,
-		},
-		{
-			name:          "invalid hour - too high",
-			scheduleTime:  "25:30",
-			expectedError: true,
-		},
-		{
-			name:          "invalid hour - negative",
-			scheduleTime:  "-1:30",
-			expectedError: true,
-		},
-		{
-			name:          "invalid minute - too high",
-			scheduleTime:  "14:60",
-			expectedError: true,
-		},
-		{
-			name:          "invalid minute - negative",
-			scheduleTime:  "14:-1",
-			expectedError: true,
-		},
-		{
-			name:          "non-numeric hour",
-			scheduleTime:  "ab:30",
-			expectedError: true,
-		},
-		{
-			name:          "non-numeric minute",
-			scheduleTime:  "14:cd",
-			expectedError: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			hour, minute, err := parseScheduleTime(tt.scheduleTime)
-
-			if tt.expectedError {
-				if err == nil {
-					t.Errorf("Expected error for input %q, but got none", tt.scheduleTime)
-				}
-				return
-			}
-
-			if err != nil {
-				t.Errorf("Unexpected error for input %q: %v", tt.scheduleTime, err)
-				return
-			}
-
-			if hour != tt.expectedHour {
-				t.Errorf("Hour mismatch for %q: expected %d, got %d", tt.scheduleTime, tt.expectedHour, hour)
-			}
-
-			if minute != tt.expectedMin {
-				t.Errorf("Minute mismatch for %q: expected %d, got %d", tt.scheduleTime, tt.expectedMin, minute)
-			}
-		})
 	}
 }

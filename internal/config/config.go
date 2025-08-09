@@ -11,8 +11,8 @@ import (
 // Priority order: .env.local > .env > system environment variables
 func LoadEnvFiles() error {
 	envFiles := []string{
-		".env",
 		".env.local",
+		".env",
 	}
 
 	for _, file := range envFiles {
