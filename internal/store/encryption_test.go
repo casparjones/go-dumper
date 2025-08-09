@@ -1,13 +1,15 @@
 package store
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"os"
 	"testing"
 )
 
 func TestEncryptDecryptPassword(t *testing.T) {
 	// Set up test encryption key
-	testKey := "dGVzdGtleTEyMzQ1Njc4OTBhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5ej0="
+	testKey := "ZhRwyRc6+ScRvBqVGiiwRiIiahXh503NTHT7E2p/3WQ="
 	os.Setenv("APP_ENC_KEY", testKey)
 	defer os.Unsetenv("APP_ENC_KEY")
 
@@ -83,7 +85,7 @@ func TestEncryptDecryptPassword(t *testing.T) {
 
 func TestInvalidDecryption(t *testing.T) {
 	// Set up test encryption key
-	testKey := "dGVzdGtleTEyMzQ1Njc4OTBhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5ej0="
+	testKey := "ZhRwyRc6+ScRvBqVGiiwRiIiahXh503NTHT7E2p/3WQ="
 	os.Setenv("APP_ENC_KEY", testKey)
 	defer os.Unsetenv("APP_ENC_KEY")
 
@@ -126,7 +128,7 @@ func TestInvalidDecryption(t *testing.T) {
 
 func TestGenerateEncryptionKey(t *testing.T) {
 	key := GenerateEncryptionKey()
-	
+
 	if len(key) == 0 {
 		t.Fatal("Generated key is empty")
 	}
