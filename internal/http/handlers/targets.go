@@ -4,14 +4,14 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/casparjones/go-dumper/internal/backup"
+	"github.com/casparjones/go-dumper/internal/store"
 	"github.com/gin-gonic/gin"
-	"github.com/user/go-dumper/internal/backup"
-	"github.com/user/go-dumper/internal/store"
 )
 
 type TargetsHandler struct {
-	repo    *store.Repository
-	dumper  *backup.Dumper
+	repo   *store.Repository
+	dumper *backup.Dumper
 }
 
 type CreateTargetRequest struct {

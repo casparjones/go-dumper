@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/casparjones/go-dumper/internal/store"
 	"github.com/go-sql-driver/mysql"
-	"github.com/user/go-dumper/internal/store"
 
 	_ "modernc.org/sqlite"
 )

@@ -10,8 +10,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/casparjones/go-dumper/internal/store"
 	"github.com/go-sql-driver/mysql"
-	"github.com/user/go-dumper/internal/store"
 )
 
 type Restorer struct {
@@ -68,7 +68,7 @@ func (r *Restorer) RestoreBackup(ctx context.Context, backupID int64) error {
 		Addr:   fmt.Sprintf("%s:%d", target.Host, target.Port),
 		DBName: target.DBName,
 		Params: map[string]string{
-			"charset":   "utf8mb4",
+			"charset":         "utf8mb4",
 			"multiStatements": "true",
 		},
 		ParseTime:            true,
@@ -139,14 +139,14 @@ func (r *Restorer) executeStatement(ctx context.Context, db *sql.DB, statement s
 		return nil
 	}
 
-	if strings.HasPrefix(strings.ToUpper(statement), "LOCK TABLES") || 
-	   strings.HasPrefix(strings.ToUpper(statement), "UNLOCK TABLES") {
+	if strings.HasPrefix(strings.ToUpper(statement), "LOCK TABLES") ||
+		strings.HasPrefix(strings.ToUpper(statement), "UNLOCK TABLES") {
 		return nil
 	}
 
 	if strings.HasPrefix(statement, "/*!") && strings.HasSuffix(statement, "*/;") {
 		versionComment := statement[3 : len(statement)-3]
-		
+
 		if len(versionComment) > 5 {
 			versionStr := versionComment[:5]
 			if strings.HasPrefix(versionStr, "40") || strings.HasPrefix(versionStr, "50") {
@@ -169,7 +169,7 @@ func (r *Restorer) executeStatement(ctx context.Context, db *sql.DB, statement s
 			return fmt.Errorf("access denied - check user permissions: %w", err)
 		}
 	}
-	
+
 	return err
 }
 

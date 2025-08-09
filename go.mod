@@ -1,4 +1,4 @@
-module github.com/user/go-dumper
+module github.com/casparjones/go-dumper
 
 go 1.22
 

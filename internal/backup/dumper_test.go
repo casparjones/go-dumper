@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/user/go-dumper/internal/store"
+	"github.com/casparjones/go-dumper/internal/store"
 )
 
 func TestFormatValue(t *testing.T) {
@@ -146,7 +146,7 @@ func TestEscapeString(t *testing.T) {
 func TestWriteHeader(t *testing.T) {
 	d := &Dumper{}
 	var buf strings.Builder
-	
+
 	target := &store.Target{
 		Host:   "localhost",
 		DBName: "testdb",

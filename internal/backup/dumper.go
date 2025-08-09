@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/casparjones/go-dumper/internal/store"
 	"github.com/go-sql-driver/mysql"
-	"github.com/user/go-dumper/internal/store"
 )
 
 type Dumper struct {
@@ -23,10 +23,10 @@ type Dumper struct {
 }
 
 type DumpOptions struct {
-	Target      *store.Target
-	BackupID    int64
-	Compress    bool
-	BatchSize   int
+	Target    *store.Target
+	BackupID  int64
+	Compress  bool
+	BatchSize int
 }
 
 func NewDumper(repo *store.Repository, backupDir string) *Dumper {

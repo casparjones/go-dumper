@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/user/go-dumper/internal/backup"
-	"github.com/user/go-dumper/internal/config"
-	"github.com/user/go-dumper/internal/store"
+	"github.com/casparjones/go-dumper/internal/backup"
+	"github.com/casparjones/go-dumper/internal/config"
+	"github.com/casparjones/go-dumper/internal/store"
 )
 
 type Scheduler struct {
@@ -35,9 +35,9 @@ func New(db *sql.DB) *Scheduler {
 
 func (s *Scheduler) Start() {
 	s.ticker = time.NewTicker(1 * time.Minute)
-	
+
 	log.Println("Scheduler started")
-	
+
 	for {
 		select {
 		case <-s.ticker.C:
@@ -74,7 +74,7 @@ func (s *Scheduler) checkAndRunScheduledBackups() {
 		if target.ScheduleTime == currentTime {
 			if s.shouldRunBackup(target.ID) {
 				log.Printf("Starting scheduled backup for target: %s", target.Name)
-				
+
 				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 				defer cancel()
 
@@ -99,9 +99,9 @@ func (s *Scheduler) shouldRunBackup(targetID int64) bool {
 
 	for _, backup := range backups {
 		backupDay := backup.StartedAt.Truncate(24 * time.Hour)
-		
-		if backupDay.Equal(today) && 
-		   (backup.Status == store.BackupStatusSuccess || backup.Status == store.BackupStatusRunning) {
+
+		if backupDay.Equal(today) &&
+			(backup.Status == store.BackupStatusSuccess || backup.Status == store.BackupStatusRunning) {
 			return false
 		}
 	}
