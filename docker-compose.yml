@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  go-dumper:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_PORT=8080
+      - SQLITE_PATH=/data/app/app.db
+      - BACKUP_DIR=/data/backups
+      - APP_ENC_KEY=CHANGE_ME_32_BYTE_BASE64_KEY_HERE
+      # Optional basic auth
+      # - ADMIN_USER=admin
+      # - ADMIN_PASS=password
+    volumes:
+      - go-dumper-data:/data/app
+      - go-dumper-backups:/data/backups
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Optional: MySQL for testing
+  mysql:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=testdb
+      - MYSQL_USER=testuser
+      - MYSQL_PASSWORD=testpass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    restart: unless-stopped
+    profiles:
+      - testing
+
+volumes:
+  go-dumper-data:
+  go-dumper-backups:
+  mysql-data:
