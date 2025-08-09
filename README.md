@@ -21,7 +21,7 @@ A self-hosted MySQL/MariaDB backup tool similar to MySQLDumper, built with Go an
 export APP_ENC_KEY=$(openssl rand -base64 32)
 
 # Run with Docker Compose
-curl -o docker-compose.yml https://raw.githubusercontent.com/user/go-dumper/main/docker-compose.yml
+curl -o docker-compose.yml https://raw.githubusercontent.com/casparjones/go-dumper/main/docker-compose.yml
 docker compose up -d
 ```
 
@@ -34,13 +34,13 @@ docker run -p 8080:8080 \
   -e SQLITE_PATH=/data/app/app.db \
   -v go-dumper-backups:/data/backups \
   -v go-dumper-data:/data/app \
-  ghcr.io/user/go-dumper:latest
+  ghcr.io/casparjones/go-dumper:latest
 ```
 
 ### From Source
 
 ```bash
-git clone https://github.com/user/go-dumper.git
+git clone https://github.com/casparjones/go-dumper.git
 cd go-dumper
 
 # Option 1: Full setup (requires Go + Node.js)
@@ -225,7 +225,7 @@ Tracks backup history, status, and file metadata with automatic cleanup.
 version: '3.8'
 services:
   go-dumper:
-    image: ghcr.io/user/go-dumper:latest
+    image: ghcr.io/casparjones/go-dumper:latest
     ports:
       - "8080:8080"
     environment:
@@ -340,12 +340,13 @@ go mod tidy
 
 ### Getting Help
 
-- 📖 **Documentation** - [GitHub Wiki](https://github.com/user/go-dumper/wiki)
-- 🐛 **Issues** - [GitHub Issues](https://github.com/user/go-dumper/issues)
-- 💬 **Discussions** - [GitHub Discussions](https://github.com/user/go-dumper/discussions)
+- 📖 **Documentation** - [GitHub Wiki](https://github.com/casparjones/go-dumper/wiki)
+- 🐛 **Issues** - [GitHub Issues](https://github.com/casparjones/go-dumper/issues)
+- 💬 **Discussions** - [GitHub Discussions](https://github.com/casparjones/go-dumper/discussions)
 
 ## Acknowledgments
 
 - Inspired by [MySQLDumper](http://www.mysqldumper.de/)
 - Built with modern tools and practices
 - Community-driven development
+- Built with assistance from AI tools (Claude Code/OpenAI Codex)

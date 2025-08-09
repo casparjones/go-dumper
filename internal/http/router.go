@@ -3,12 +3,12 @@ package router
 import (
 	"database/sql"
 
+	"github.com/casparjones/go-dumper/internal/backup"
+	"github.com/casparjones/go-dumper/internal/config"
+	"github.com/casparjones/go-dumper/internal/http/handlers"
+	"github.com/casparjones/go-dumper/internal/http/middleware"
+	"github.com/casparjones/go-dumper/internal/store"
 	"github.com/gin-gonic/gin"
-	"github.com/user/go-dumper/internal/backup"
-	"github.com/user/go-dumper/internal/config"
-	"github.com/user/go-dumper/internal/http/handlers"
-	"github.com/user/go-dumper/internal/http/middleware"
-	"github.com/user/go-dumper/internal/store"
 )
 
 func New(db *sql.DB) *gin.Engine {
@@ -23,7 +23,7 @@ func New(db *sql.DB) *gin.Engine {
 
 	repo := store.NewRepository(db)
 	backupDir := config.GetEnv("BACKUP_DIR", "/data/backups")
-	
+
 	dumper := backup.NewDumper(repo, backupDir)
 	restorer := backup.NewRestorer(repo)
 

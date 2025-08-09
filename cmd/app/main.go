@@ -10,10 +10,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/user/go-dumper/internal/config"
-	"github.com/user/go-dumper/internal/http/router"
-	"github.com/user/go-dumper/internal/scheduler"
-	"github.com/user/go-dumper/internal/store"
+	"github.com/casparjones/go-dumper/internal/config"
+	router "github.com/casparjones/go-dumper/internal/http"
+	"github.com/casparjones/go-dumper/internal/scheduler"
+	"github.com/casparjones/go-dumper/internal/store"
 )
 
 func main() {
@@ -40,7 +40,7 @@ func main() {
 	defer sched.Stop()
 
 	r := router.New(db)
-	
+
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
 		Handler: r,

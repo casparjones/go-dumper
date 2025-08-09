@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/casparjones/go-dumper/internal/backup"
+	"github.com/casparjones/go-dumper/internal/store"
 	"github.com/gin-gonic/gin"
-	"github.com/user/go-dumper/internal/backup"
-	"github.com/user/go-dumper/internal/store"
 )
 
 type BackupsHandler struct {
@@ -80,7 +80,7 @@ func (h *BackupsHandler) RestoreBackup(c *gin.Context) {
 	}()
 
 	c.JSON(http.StatusAccepted, gin.H{
-		"message": "Restore started",
+		"message":   "Restore started",
 		"backup_id": id,
 	})
 }
