@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -25,7 +24,7 @@ func BasicAuth() gin.HandlerFunc {
 func CORS() gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		
+
 		if gin.Mode() == gin.DebugMode {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		} else {
