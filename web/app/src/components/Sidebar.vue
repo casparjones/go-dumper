@@ -13,8 +13,18 @@
         <!-- Logo Placeholder -->
         <div class="flex justify-center mb-2">
           <div class="w-16 h-16 bg-primary/20 rounded-lg flex items-center justify-center border-2 border-primary/30">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 1.79 4 4 4h8c2.21 0 4-1.79 4-4V7M4 7l8-4 8 4M4 7l8 4 8-4" />
+            <svg xmlns="http://www.w3.org/2000/svg"
+                 class="w-8 h-8 text-primary"
+                 viewBox="0 0 24 24"
+                 fill="none"
+                 stroke="currentColor"
+                 stroke-width="2"
+                 stroke-linecap="round"
+                 stroke-linejoin="round">
+              <ellipse cx="12" cy="5" rx="8" ry="3"></ellipse>
+              <path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"></path>
+              <path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"></path>
+              <path d="M4 18c0 1.66 3.58 3 8 3s8-1.34 8-3"></path>
             </svg>
           </div>
         </div>
@@ -182,13 +192,3 @@ onMounted(() => {
   targetStore.fetchTargets()
 })
 </script>
-
-<style scoped>
-.menu li a.active {
-  @apply bg-primary text-primary-content;
-}
-
-.menu li a:hover {
-  @apply bg-base-300;
-}
-</style>

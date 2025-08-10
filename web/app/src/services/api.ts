@@ -1,4 +1,5 @@
-import axios, { AxiosResponse } from 'axios'
+import axios from 'axios'
+import type { AxiosResponse, AxiosError, AxiosInstance } from 'axios'
 import type { Target, CreateTargetRequest, UpdateTargetRequest, Backup } from '@/types'
 import { useToastStore } from '@/stores/toasts'
 

@@ -1,5 +1,12 @@
-@import 'tailwindcss/base';
-@import 'tailwindcss/components';
-@import 'tailwindcss/utilities';
+@import "tailwindcss";
 
-/* Add any custom styles here */
+/* DaisyUI v5 in v4 per CSS registrieren + konfigurieren */
+@plugin "daisyui" {
+    themes: light --default, dark;
+    base: true;
+    styled: true;
+    utils: true;
+    prefix: "";
+    logs: false;
+    root: ":root";
+}

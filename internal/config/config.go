@@ -8,7 +8,7 @@ import (
 )
 
 // LoadEnvFiles loads environment variables from .env files
-// Priority order: .env.local > .env > system environment variables
+// Priority order: .env > .env > system environment variables
 func LoadEnvFiles() error {
 	envFiles := []string{
 		".env",
@@ -64,7 +64,7 @@ func loadEnvFile(filename string) error {
 			}
 		}
 
-		// Only set if not already set (allows .env.local to override .env)
+		// Only set if not already set (allows .env to override .env)
 		if os.Getenv(key) == "" {
 			if err := os.Setenv(key, value); err != nil {
 				return fmt.Errorf("failed to set environment variable %s: %w", key, err)

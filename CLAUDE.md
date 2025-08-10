@@ -63,7 +63,6 @@ web/app/
   src/components/{Forms,Tables,Toasts,Modals}.vue
   src/services/api.ts
   index.html
-  tailwind.config.js; postcss.config.js; input.css
 Build-Output nach web/public (von Gin als static served).
 
 8) Backend-Struktur

@@ -238,7 +238,7 @@ const systemInfo = ref({
   uptime: '2 days, 14 hours',
   backupDir: '/data/backups',
   databasePath: '/data/app/app.db',
-  configFiles: ['.env', '.env.local']
+  configFiles: ['.env', '.env']
 })
 
 const faqs = ref([

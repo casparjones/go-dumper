@@ -9,7 +9,7 @@ import (
 func TestLoadEnvFile(t *testing.T) {
 	// Create temporary directory
 	tempDir := t.TempDir()
-	
+
 	// Create test .env file
 	envContent := `# Test environment file
 APP_PORT=9999
@@ -31,7 +31,7 @@ ADMIN_PASS='test password with spaces'
 		t.Fatal(err)
 	}
 	defer os.Chdir(oldWd)
-	
+
 	if err := os.Chdir(tempDir); err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +70,7 @@ ADMIN_PASS='test password with spaces'
 func TestLoadEnvFilesPriority(t *testing.T) {
 	// Create temporary directory
 	tempDir := t.TempDir()
-	
+
 	// Create .env file
 	envContent := `APP_PORT=8080
 SHARED_VAR=from_env
@@ -80,11 +80,11 @@ ENV_ONLY=env_value`
 		t.Fatal(err)
 	}
 
-	// Create .env.local file (should override .env)
+	// Create .env file (should override .env)
 	envLocalContent := `APP_PORT=3000
 SHARED_VAR=from_local
 LOCAL_ONLY=local_value`
-	envLocalPath := filepath.Join(tempDir, ".env.local")
+	envLocalPath := filepath.Join(tempDir, ".env")
 	if err := os.WriteFile(envLocalPath, []byte(envLocalContent), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +95,7 @@ LOCAL_ONLY=local_value`
 		t.Fatal(err)
 	}
 	defer os.Chdir(oldWd)
-	
+
 	if err := os.Chdir(tempDir); err != nil {
 		t.Fatal(err)
 	}
@@ -111,16 +111,16 @@ LOCAL_ONLY=local_value`
 		t.Fatalf("LoadEnvFiles failed: %v", err)
 	}
 
-	// Test priority: .env.local should override .env
+	// Test priority: .env should override .env
 	tests := []struct {
 		key      string
 		expected string
 		desc     string
 	}{
-		{"APP_PORT", "3000", ".env.local should override .env"},
-		{"SHARED_VAR", "from_local", ".env.local should override .env for shared vars"},
-		{"ENV_ONLY", "env_value", ".env values should be loaded when not in .env.local"},
-		{"LOCAL_ONLY", "local_value", ".env.local only values should be loaded"},
+		{"APP_PORT", "3000", ".env should override .env"},
+		{"SHARED_VAR", "from_local", ".env should override .env for shared vars"},
+		{"ENV_ONLY", "env_value", ".env values should be loaded when not in .env"},
+		{"LOCAL_ONLY", "local_value", ".env only values should be loaded"},
 	}
 
 	for _, tt := range tests {
@@ -133,7 +133,7 @@ LOCAL_ONLY=local_value`
 func TestSystemEnvPriority(t *testing.T) {
 	// Create temporary directory
 	tempDir := t.TempDir()
-	
+
 	// Create .env file
 	envContent := `APP_PORT=8080`
 	envPath := filepath.Join(tempDir, ".env")
@@ -147,7 +147,7 @@ func TestSystemEnvPriority(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.Chdir(oldWd)
-	
+
 	if err := os.Chdir(tempDir); err != nil {
 		t.Fatal(err)
 	}
@@ -200,12 +200,12 @@ func TestRequireEnv(t *testing.T) {
 func TestConfigLoad(t *testing.T) {
 	// Set test environment variables
 	testEnvs := map[string]string{
-		"APP_PORT":      "9999",
-		"APP_ENC_KEY":   "test_key_123",
-		"SQLITE_PATH":   "/test/app.db",
-		"BACKUP_DIR":    "/test/backups",
-		"ADMIN_USER":    "testadmin",
-		"ADMIN_PASS":    "testpass",
+		"APP_PORT":    "9999",
+		"APP_ENC_KEY": "test_key_123",
+		"SQLITE_PATH": "/test/app.db",
+		"BACKUP_DIR":  "/test/backups",
+		"ADMIN_USER":  "testadmin",
+		"ADMIN_PASS":  "testpass",
 	}
 
 	for key, value := range testEnvs {

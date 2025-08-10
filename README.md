@@ -51,8 +51,8 @@ make setup-ui
 
 # Generate encryption key and set up environment
 make generate-key  # Copy this key
-cp .env.local.example .env.local  # For local development
-# Edit .env.local and paste the generated APP_ENC_KEY
+cp .env.example .env  # For local development
+# Edit .env and paste the generated APP_ENC_KEY
 
 # Start development servers
 make dev
@@ -90,7 +90,7 @@ The application supports multiple ways to set environment variables:
 cp .env.example .env
 
 # For local development (overrides .env)
-cp .env.local.example .env.local
+cp .env.example .env
 
 # Generate encryption key
 make generate-key
@@ -304,15 +304,15 @@ npm install
 ```bash
 # Solution: Generate and set encryption key
 make generate-key
-# Copy the generated key to .env.local
-echo "APP_ENC_KEY=your_generated_key_here" >> .env.local
+# Copy the generated key to .env
+echo "APP_ENC_KEY=your_generated_key_here" >> .env
 ```
 
 **Problem**: Permission denied when creating backup directories
 ```bash
 # Solution: Check permissions and create directories
 mkdir -p ./data ./backups
-# Or adjust BACKUP_DIR and SQLITE_PATH in .env.local
+# Or adjust BACKUP_DIR and SQLITE_PATH in .env
 ```
 
 **Problem**: MySQL connection fails

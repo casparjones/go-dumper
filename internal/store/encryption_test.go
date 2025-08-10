@@ -1,6 +1,8 @@
 package store
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"os"
 	"testing"
 )
@@ -126,7 +128,7 @@ func TestInvalidDecryption(t *testing.T) {
 
 func TestGenerateEncryptionKey(t *testing.T) {
 	key := GenerateEncryptionKey()
-	
+
 	if len(key) == 0 {
 		t.Fatal("Generated key is empty")
 	}

@@ -8,44 +8,62 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 )
 
 var (
-	gcm cipher.AEAD
+	gcm           cipher.AEAD
+	cipherOnce    sync.Once
+	cipherInitErr error
 )
 
-func init() {
-	key := getEncryptionKey()
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		panic(fmt.Sprintf("failed to create cipher: %v", err))
-	}
+func ensureCipher() error {
+	cipherOnce.Do(func() {
+		key, err := getEncryptionKey()
+		if err != nil {
+			cipherInitErr = err
+			return
+		}
 
-	gcm, err = cipher.NewGCM(block)
-	if err != nil {
-		panic(fmt.Sprintf("failed to create GCM: %v", err))
-	}
+		block, err := aes.NewCipher(key)
+		if err != nil {
+			cipherInitErr = fmt.Errorf("failed to create cipher: %w", err)
+			return
+		}
+
+		g, err := cipher.NewGCM(block)
+		if err != nil {
+			cipherInitErr = fmt.Errorf("failed to create GCM: %w", err)
+			return
+		}
+		gcm = g
+	})
+	return cipherInitErr
 }
 
-func getEncryptionKey() []byte {
+func getEncryptionKey() ([]byte, error) {
 	keyBase64 := os.Getenv("APP_ENC_KEY")
 	if keyBase64 == "" {
-		panic("APP_ENC_KEY environment variable is required (32-byte base64 key)")
+		return nil, fmt.Errorf("APP_ENC_KEY environment variable is required (32-byte base64 key)")
 	}
 
 	key, err := base64.StdEncoding.DecodeString(keyBase64)
 	if err != nil {
-		panic(fmt.Sprintf("invalid APP_ENC_KEY format: %v", err))
+		return nil, fmt.Errorf("invalid APP_ENC_KEY format: %w", err)
 	}
 
 	if len(key) != 32 {
-		panic("APP_ENC_KEY must be 32 bytes when decoded")
+		return nil, fmt.Errorf("APP_ENC_KEY must be 32 bytes when decoded")
 	}
 
-	return key
+	return key, nil
 }
 
 func EncryptPassword(password string) (string, error) {
+	if err := ensureCipher(); err != nil {
+		return "", err
+	}
+
 	nonce := make([]byte, gcm.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return "", fmt.Errorf("failed to generate nonce: %w", err)
@@ -56,6 +74,10 @@ func EncryptPassword(password string) (string, error) {
 }
 
 func DecryptPassword(encrypted string) (string, error) {
+	if err := ensureCipher(); err != nil {
+		return "", err
+	}
+
 	data, err := base64.StdEncoding.DecodeString(encrypted)
 	if err != nil {
 		return "", fmt.Errorf("failed to decode encrypted password: %w", err)
