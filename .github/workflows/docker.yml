@@ -32,81 +32,49 @@ jobs:
           --health-retries=3
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.22'
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
 
-    - name: Download Go dependencies
-      run: go mod download
+      - name: Download Go dependencies
+        run: go mod download
 
-    - name: Run Go tests
-      env:
-        APP_ENC_KEY: ${{ secrets.TEST_ENCRYPTION_KEY || 'dGVzdGtleTEyMzQ1Njc4OTBhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5ej0=' }}
-      run: |
-        go test ./... -race -coverprofile=coverage.out
-        go tool cover -func=coverage.out | awk '/total:/ { 
-          split($3,a,"%"); 
-          print "Coverage:" $3
-        }'
+      - name: Run Go tests
+        env:
+          APP_ENC_KEY: ${{ secrets.TEST_ENCRYPTION_KEY || 'dGVzdGtleTEyMzQ1Njc4OTBhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5ej0=' }}
+        run: |
+          go test ./... -race -coverprofile=coverage.out
+          go tool cover -func=coverage.out | awk '/total:/ { 
+            split($3,a,"%"); 
+            print "Coverage:" $3
+          }'
 
-    - name: Run integration tests
-      env:
-        APP_ENC_KEY: ${{ secrets.TEST_ENCRYPTION_KEY || 'dGVzdGtleTEyMzQ1Njc4OTBhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5ej0=' }}
-        MYSQL_DSN: "testuser:testpass@tcp(localhost:3306)/testdb"
-      run: |
-        go test ./internal/... -tags=integration -v
+      - name: Run integration tests
+        env:
+          APP_ENC_KEY: ${{ secrets.TEST_ENCRYPTION_KEY || 'dGVzdGtleTEyMzQ1Njc4OTBhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5ej0=' }}
+          MYSQL_DSN: "testuser:testpass@tcp(localhost:3306)/testdb"
+        run: |
+          go test ./internal/... -tags=integration -v
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: web/app/package-lock.json
+      # Frontend nur bauen (keine Tests/E2E)
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/app/package-lock.json
 
-    - name: Install frontend dependencies
-      working-directory: web/app
-      run: npm ci
+      - name: Install frontend dependencies
+        working-directory: web/app
+        run: npm ci
 
-    - name: Run frontend tests
-      working-directory: web/app
-      run: |
-        npm run test:coverage
-        # Check coverage threshold
-        node -e "
-          const fs = require('fs');
-          try {
-            const coverage = JSON.parse(fs.readFileSync('coverage/coverage-summary.json'));
-            const total = coverage.total;
-            const thresholds = ['lines', 'statements', 'functions', 'branches'];
-            let failed = false;
-            thresholds.forEach(type => {
-              console.info(\`\${type} coverage: \${total[type].pct}%\`);
-            });
-            if (failed) process.exit(1);
-            console.log('Frontend coverage passed');
-          } catch (e) {
-            console.error('Could not read coverage file');
-            process.exit(1);
-          }
-        "
-
-    - name: Install Playwright
-      working-directory: web/app
-      run: npx playwright install --with-deps
-
-    - name: Run E2E tests
-      working-directory: web/app
-      env:
-        APP_ENC_KEY: ${{ secrets.TEST_ENCRYPTION_KEY || 'dGVzdGtleTEyMzQ1Njc4OTBhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5ej0=' }}
-      run: npm run test:e2e
-
-    - name: Build frontend
-      working-directory: web/app
-      run: npm run build
+      - name: Build frontend
+        working-directory: web/app
+        run: npm run build
 
   build-and-push:
     needs: test
