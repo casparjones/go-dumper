@@ -23,6 +23,41 @@ func NewBackupsHandler(repo *store.Repository, restorer *backup.Restorer) *Backu
 	}
 }
 
+type BackupWithTargetInfo struct {
+	*store.Backup
+	TargetName string `json:"target_name"`
+	Host       string `json:"host"`
+	Port       int    `json:"port"`
+}
+
+func (h *BackupsHandler) GetAllBackups(c *gin.Context) {
+	backups, err := h.repo.GetAllBackups()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get target information for each backup
+	var backupsWithTargetInfo []BackupWithTargetInfo
+	for _, backup := range backups {
+		target, err := h.repo.GetTarget(backup.TargetID)
+		if err != nil {
+			// Skip this backup if we can't find the target
+			continue
+		}
+
+		backupWithInfo := BackupWithTargetInfo{
+			Backup:     backup,
+			TargetName: target.Name,
+			Host:       target.Host,
+			Port:       target.Port,
+		}
+		backupsWithTargetInfo = append(backupsWithTargetInfo, backupWithInfo)
+	}
+
+	c.JSON(http.StatusOK, backupsWithTargetInfo)
+}
+
 func (h *BackupsHandler) DownloadBackup(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -54,6 +89,10 @@ func (h *BackupsHandler) DownloadBackup(c *gin.Context) {
 	c.File(backup.FilePath)
 }
 
+type RestoreBackupRequest struct {
+	CreateDatabase bool `json:"create_database"`
+}
+
 func (h *BackupsHandler) RestoreBackup(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -72,16 +111,34 @@ func (h *BackupsHandler) RestoreBackup(c *gin.Context) {
 		return
 	}
 
+	// Parse restore options from request body (optional)
+	var req RestoreBackupRequest
+	if c.Request.ContentLength > 0 {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+			return
+		}
+	}
+
 	go func() {
-		if err := h.restorer.RestoreBackup(c.Request.Context(), id); err != nil {
-			// In a production system, you might want to log this error
-			// or update a restore status in the database
+		var restoreErr error
+		if req.CreateDatabase {
+			restoreErr = h.restorer.RestoreBackupWithOptions(c.Request.Context(), id, true)
+		} else {
+			restoreErr = h.restorer.RestoreBackup(c.Request.Context(), id)
+		}
+		
+		if restoreErr != nil {
+			// Log the error for debugging
+			// In a production system, you might want to update a restore status in the database
+			// or notify the user through websockets/polling
 		}
 	}()
 
 	c.JSON(http.StatusAccepted, gin.H{
-		"message":   "Restore started",
-		"backup_id": id,
+		"message":       "Restore started",
+		"backup_id":     id,
+		"database_name": backup.DatabaseName,
 	})
 }
 

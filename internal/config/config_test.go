@@ -80,11 +80,11 @@ ENV_ONLY=env_value`
 		t.Fatal(err)
 	}
 
-	// Create .env file (should override .env)
+	// Create .env.local file (should override .env)
 	envLocalContent := `APP_PORT=3000
 SHARED_VAR=from_local
 LOCAL_ONLY=local_value`
-	envLocalPath := filepath.Join(tempDir, ".env")
+	envLocalPath := filepath.Join(tempDir, ".env.local")
 	if err := os.WriteFile(envLocalPath, []byte(envLocalContent), 0644); err != nil {
 		t.Fatal(err)
 	}

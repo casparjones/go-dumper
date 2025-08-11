@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -22,10 +23,11 @@ type Dumper struct {
 }
 
 type DumpOptions struct {
-	Target    *store.Target
-	BackupID  int64
-	Compress  bool
-	BatchSize int
+	Target       *store.Target
+	DatabaseName string
+	BackupID     int64
+	Compress     bool
+	BatchSize    int
 }
 
 func NewDumper(repo *store.Repository, backupDir string) *Dumper {
@@ -41,39 +43,151 @@ func (d *Dumper) CreateBackup(ctx context.Context, targetID int64) (*store.Backu
 		return nil, fmt.Errorf("failed to get target: %w", err)
 	}
 
-	backup := &store.Backup{
-		TargetID:  targetID,
-		StartedAt: time.Now(),
-		Status:    store.BackupStatusRunning,
+	// Get databases to backup based on target configuration
+	databases, err := d.getDatabasesForTarget(target)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get databases for target: %w", err)
 	}
 
-	if err := d.repo.CreateBackup(backup); err != nil {
-		return nil, fmt.Errorf("failed to create backup record: %w", err)
+	if len(databases) == 0 {
+		return nil, fmt.Errorf("no databases found to backup")
 	}
 
+	// Create backup records for each database
+	backups := make([]*store.Backup, 0, len(databases))
+	for _, dbName := range databases {
+		backup := &store.Backup{
+			TargetID:     targetID,
+			DatabaseName: dbName,
+			StartedAt:    time.Now(),
+			Status:       store.BackupStatusRunning,
+		}
+
+		if err := d.repo.CreateBackup(backup); err != nil {
+			return nil, fmt.Errorf("failed to create backup record for %s: %w", dbName, err)
+		}
+		backups = append(backups, backup)
+	}
+
+	// Start backup process in background
 	go func() {
-		d.performBackup(context.Background(), backup, target)
+		d.performMultipleDatabaseBackup(context.Background(), backups, target)
 	}()
 
-	return backup, nil
+	// Return the first backup as reference (for API compatibility)
+	return backups[0], nil
 }
 
-func (d *Dumper) performBackup(ctx context.Context, backup *store.Backup, target *store.Target) {
+func (d *Dumper) getDatabasesForTarget(target *store.Target) ([]string, error) {
 	password, err := store.DecryptPassword(target.PasswordEnc)
 	if err != nil {
-		d.updateBackupStatus(backup, store.BackupStatusFailed, fmt.Sprintf("Failed to decrypt password: %v", err))
+		return nil, fmt.Errorf("failed to decrypt password: %w", err)
+	}
+
+	// Connect without specifying a database
+	cfg := mysql.Config{
+		User:   target.User,
+		Passwd: password,
+		Net:    "tcp",
+		Addr:   fmt.Sprintf("%s:%d", target.Host, target.Port),
+		Params: map[string]string{
+			"charset": "utf8mb4",
+		},
+		ParseTime:            true,
+		AllowNativePasswords: true,
+	}
+
+	db, err := sql.Open("mysql", cfg.FormatDSN())
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to MySQL: %w", err)
+	}
+	defer db.Close()
+
+	if err := db.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping MySQL: %w", err)
+	}
+
+	if target.DatabaseMode == store.DatabaseModeAll {
+		return d.getAllDatabases(db)
+	} else if target.DatabaseMode == store.DatabaseModeSelected {
+		return d.getSelectedDatabases(target)
+	}
+
+	return nil, fmt.Errorf("invalid database mode: %s", target.DatabaseMode)
+}
+
+func (d *Dumper) getAllDatabases(db *sql.DB) ([]string, error) {
+	rows, err := db.Query("SHOW DATABASES")
+	if err != nil {
+		return nil, fmt.Errorf("failed to list databases: %w", err)
+	}
+	defer rows.Close()
+
+	var databases []string
+	systemDatabases := map[string]bool{
+		"information_schema": true,
+		"performance_schema": true,
+		"mysql":              true,
+		"sys":                true,
+	}
+
+	for rows.Next() {
+		var dbName string
+		if err := rows.Scan(&dbName); err != nil {
+			return nil, fmt.Errorf("failed to scan database name: %w", err)
+		}
+
+		// Skip system databases
+		if !systemDatabases[dbName] {
+			databases = append(databases, dbName)
+		}
+	}
+
+	return databases, nil
+}
+
+func (d *Dumper) getSelectedDatabases(target *store.Target) ([]string, error) {
+	if target.SelectedDatabases == "" {
+		return nil, fmt.Errorf("no databases selected")
+	}
+
+	var databases []string
+	if err := json.Unmarshal([]byte(target.SelectedDatabases), &databases); err != nil {
+		return nil, fmt.Errorf("failed to parse selected databases: %w", err)
+	}
+
+	return databases, nil
+}
+
+func (d *Dumper) performMultipleDatabaseBackup(ctx context.Context, backups []*store.Backup, target *store.Target) {
+	password, err := store.DecryptPassword(target.PasswordEnc)
+	if err != nil {
+		for _, backup := range backups {
+			d.updateBackupStatus(backup, store.BackupStatusFailed, fmt.Sprintf("Failed to decrypt password: %v", err))
+		}
 		return
 	}
 
+	// Process each database backup
+	for _, backup := range backups {
+		d.performSingleDatabaseBackup(ctx, backup, target, password)
+	}
+
+	// Cleanup old backups after all databases are processed
+	d.cleanupOldBackups(target.ID, target.RetentionDays)
+}
+
+func (d *Dumper) performSingleDatabaseBackup(ctx context.Context, backup *store.Backup, target *store.Target, password string) {
 	timestamp := backup.StartedAt.Format("2006-01-02_15-04-05")
-	filename := fmt.Sprintf("%s_%s.sql.gz", target.Name, timestamp)
+	filename := fmt.Sprintf("%s_%s_%s.sql.gz", target.Name, backup.DatabaseName, timestamp)
 	filepath := filepath.Join(d.backupDir, filename)
 
 	options := &DumpOptions{
-		Target:    target,
-		BackupID:  backup.ID,
-		Compress:  target.AutoCompress,
-		BatchSize: 1000,
+		Target:       target,
+		DatabaseName: backup.DatabaseName,
+		BackupID:     backup.ID,
+		Compress:     target.AutoCompress,
+		BatchSize:    1000,
 	}
 
 	size, err := d.dumpDatabase(ctx, options, filepath, password)
@@ -92,8 +206,6 @@ func (d *Dumper) performBackup(ctx context.Context, backup *store.Backup, target
 		d.updateBackupStatus(backup, store.BackupStatusFailed, fmt.Sprintf("Failed to update backup: %v", err))
 		return
 	}
-
-	d.cleanupOldBackups(target.ID, target.RetentionDays)
 }
 
 func (d *Dumper) dumpDatabase(ctx context.Context, options *DumpOptions, outputPath, password string) (int64, error) {
@@ -102,7 +214,7 @@ func (d *Dumper) dumpDatabase(ctx context.Context, options *DumpOptions, outputP
 		Passwd: password,
 		Net:    "tcp",
 		Addr:   fmt.Sprintf("%s:%d", options.Target.Host, options.Target.Port),
-		DBName: options.Target.DBName,
+		DBName: options.DatabaseName,
 		Params: map[string]string{
 			"charset": "utf8mb4",
 		},
@@ -136,7 +248,7 @@ func (d *Dumper) dumpDatabase(ctx context.Context, options *DumpOptions, outputP
 	bufWriter := bufio.NewWriter(writer)
 	defer bufWriter.Flush()
 
-	if err := d.writeHeader(bufWriter, options.Target); err != nil {
+	if err := d.writeHeader(bufWriter, options.Target, options.DatabaseName); err != nil {
 		return 0, fmt.Errorf("failed to write header: %w", err)
 	}
 
@@ -161,14 +273,28 @@ func (d *Dumper) dumpDatabase(ctx context.Context, options *DumpOptions, outputP
 		return 0, fmt.Errorf("failed to disable foreign key checks: %w", err)
 	}
 
+	// Get tables and views separately
 	tables, err := d.getTables(ctx, tx)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get tables: %w", err)
 	}
 
+	views, err := d.getViews(ctx, tx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get views: %w", err)
+	}
+
+	// Dump tables first
 	for _, table := range tables {
 		if err := d.dumpTable(ctx, tx, bufWriter, table, options.BatchSize); err != nil {
 			return 0, fmt.Errorf("failed to dump table %s: %w", table, err)
+		}
+	}
+
+	// Dump views after tables
+	for _, view := range views {
+		if err := d.dumpView(ctx, tx, bufWriter, view); err != nil {
+			return 0, fmt.Errorf("failed to dump view %s: %w", view, err)
 		}
 	}
 
@@ -188,7 +314,7 @@ func (d *Dumper) dumpDatabase(ctx context.Context, options *DumpOptions, outputP
 	return stat.Size(), nil
 }
 
-func (d *Dumper) writeHeader(w io.Writer, target *store.Target) error {
+func (d *Dumper) writeHeader(w io.Writer, target *store.Target, databaseName string) error {
 	header := fmt.Sprintf(`-- MySQL dump created by go-dumper
 -- Host: %s    Database: %s
 -- ------------------------------------------------------
@@ -205,7 +331,7 @@ func (d *Dumper) writeHeader(w io.Writer, target *store.Target) error {
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
-`, target.Host, target.DBName)
+`, target.Host, databaseName)
 
 	_, err := w.Write([]byte(header))
 	return err
@@ -222,7 +348,8 @@ func (d *Dumper) enableForeignKeyChecks(w io.Writer) error {
 }
 
 func (d *Dumper) getTables(ctx context.Context, tx *sql.Tx) ([]string, error) {
-	rows, err := tx.QueryContext(ctx, "SHOW TABLES")
+	query := "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'"
+	rows, err := tx.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -238,6 +365,26 @@ func (d *Dumper) getTables(ctx context.Context, tx *sql.Tx) ([]string, error) {
 	}
 
 	return tables, nil
+}
+
+func (d *Dumper) getViews(ctx context.Context, tx *sql.Tx) ([]string, error) {
+	query := "SELECT table_name FROM information_schema.views WHERE table_schema = DATABASE()"
+	rows, err := tx.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var views []string
+	for rows.Next() {
+		var view string
+		if err := rows.Scan(&view); err != nil {
+			return nil, err
+		}
+		views = append(views, view)
+	}
+
+	return views, nil
 }
 
 func (d *Dumper) dumpTable(ctx context.Context, tx *sql.Tx, w io.Writer, table string, batchSize int) error {
@@ -408,6 +555,36 @@ func (d *Dumper) escapeString(s string) string {
 	s = strings.ReplaceAll(s, "\r", "\\r")
 	s = strings.ReplaceAll(s, "\t", "\\t")
 	return s
+}
+
+func (d *Dumper) dumpView(ctx context.Context, tx *sql.Tx, w io.Writer, view string) error {
+	createViewSQL, err := d.getCreateViewSQL(ctx, tx, view)
+	if err != nil {
+		return fmt.Errorf("failed to get CREATE VIEW for %s: %w", view, err)
+	}
+
+	if _, err := w.Write([]byte(fmt.Sprintf("--\n-- View structure for view `%s`\n--\n\n", view))); err != nil {
+		return err
+	}
+
+	if _, err := w.Write([]byte(fmt.Sprintf("DROP VIEW IF EXISTS `%s`;\n", view))); err != nil {
+		return err
+	}
+
+	if _, err := w.Write([]byte(createViewSQL + ";\n\n")); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *Dumper) getCreateViewSQL(ctx context.Context, tx *sql.Tx, view string) (string, error) {
+	var viewName, createSQL, charset, collation string
+	err := tx.QueryRowContext(ctx, "SHOW CREATE VIEW `"+view+"`").Scan(&viewName, &createSQL, &charset, &collation)
+	if err != nil {
+		return "", err
+	}
+	return createSQL, nil
 }
 
 func (d *Dumper) updateBackupStatus(backup *store.Backup, status, notes string) {

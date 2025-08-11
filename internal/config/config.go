@@ -8,11 +8,21 @@ import (
 )
 
 // LoadEnvFiles loads environment variables from .env files
-// Priority order: .env > .env > system environment variables
+// Priority order: system environment > .env.local > .env
 func LoadEnvFiles() error {
+	// First collect all environment variables that are already set (system env)
+	systemEnv := make(map[string]string)
+	for _, env := range os.Environ() {
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) == 2 {
+			systemEnv[parts[0]] = parts[1]
+		}
+	}
+
+	// Load .env files in priority order (lower priority first)
 	envFiles := []string{
-		".env",
-		".env.local",
+		".env",       // Lowest priority
+		".env.local", // Higher priority
 	}
 
 	for _, file := range envFiles {
@@ -22,6 +32,11 @@ func LoadEnvFiles() error {
 				return fmt.Errorf("error loading %s: %w", file, err)
 			}
 		}
+	}
+
+	// Restore system environment variables (highest priority)
+	for key, value := range systemEnv {
+		os.Setenv(key, value)
 	}
 
 	return nil
@@ -64,11 +79,9 @@ func loadEnvFile(filename string) error {
 			}
 		}
 
-		// Only set if not already set (allows .env to override .env)
-		if os.Getenv(key) == "" {
-			if err := os.Setenv(key, value); err != nil {
-				return fmt.Errorf("failed to set environment variable %s: %w", key, err)
-			}
+		// Set environment variable (always override)
+		if err := os.Setenv(key, value); err != nil {
+			return fmt.Errorf("failed to set environment variable %s: %w", key, err)
 		}
 	}
 

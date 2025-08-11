@@ -52,16 +52,17 @@ func TestTargetCRUD(t *testing.T) {
 	}
 
 	target := &Target{
-		Name:          "Test Target",
-		Host:          "localhost",
-		Port:          3306,
-		DBName:        "testdb",
-		User:          "testuser",
-		PasswordEnc:   encryptedPass,
-		Comment:       "Test comment",
-		ScheduleTime:  "02:30",
-		RetentionDays: 7,
-		AutoCompress:  true,
+		Name:              "Test Target",
+		Host:              "localhost",
+		Port:              3306,
+		User:              "testuser",
+		PasswordEnc:       encryptedPass,
+		Comment:           "Test comment",
+		ScheduleTime:      "02:30",
+		RetentionDays:     7,
+		AutoCompress:      true,
+		DatabaseMode:      DatabaseModeAll,
+		SelectedDatabases: "",
 	}
 
 	// Test Create
@@ -156,7 +157,8 @@ func TestBackupCRUD(t *testing.T) {
 		Name:        "Test Target",
 		Host:        "localhost",
 		Port:        3306,
-		DBName:      "testdb",
+		DatabaseMode:      DatabaseModeAll,
+		SelectedDatabases: "",
 		User:        "testuser",
 		PasswordEnc: encryptedPass,
 	}
@@ -302,7 +304,8 @@ func TestForeignKeyConstraints(t *testing.T) {
 		Name:        "Test Target",
 		Host:        "localhost",
 		Port:        3306,
-		DBName:      "testdb",
+		DatabaseMode:      DatabaseModeAll,
+		SelectedDatabases: "",
 		User:        "testuser",
 		PasswordEnc: encryptedPass,
 	}
@@ -314,9 +317,10 @@ func TestForeignKeyConstraints(t *testing.T) {
 
 	// Create a backup
 	backup := &Backup{
-		TargetID:  target.ID,
-		StartedAt: time.Now(),
-		Status:    BackupStatusSuccess,
+		TargetID:     target.ID,
+		DatabaseName: "testdb",
+		StartedAt:    time.Now(),
+		Status:       BackupStatusSuccess,
 	}
 
 	err = repo.CreateBackup(backup)

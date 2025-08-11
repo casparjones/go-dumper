@@ -62,6 +62,16 @@ export const targetsApi = {
   async getBackups(id: number): Promise<Backup[]> {
     const response = await api.get<Backup[]>(`/targets/${id}/backups`)
     return response.data
+  },
+
+  async discoverDatabases(host: string, port: number, user: string, password: string): Promise<{databases: {name: string}[]}> {
+    const response = await api.post('/targets/discover', {
+      host,
+      port,
+      user,
+      password
+    })
+    return response.data
   }
 }
 
@@ -98,6 +108,11 @@ export const backupsApi = {
 
   async delete(id: number): Promise<void> {
     await api.delete(`/backups/${id}`)
+  },
+
+  async getAllBackups(): Promise<any[]> {
+    const response = await api.get('/backups')
+    return response.data
   }
 }
 

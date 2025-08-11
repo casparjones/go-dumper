@@ -3,7 +3,10 @@
     "allow": [
       "Bash(mkdir:*)",
       "Bash(npm install)",
-      "Bash(make:*)"
+      "Bash(make:*)",
+      "Bash(go build:*)",
+      "Bash(go test:*)",
+      "Bash(openssl rand:*)"
     ],
     "deny": []
   }

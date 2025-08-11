@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/casparjones/go-dumper/internal/store"
 	"github.com/go-sql-driver/mysql"
@@ -40,6 +41,11 @@ func (r *Restorer) RestoreBackup(ctx context.Context, backupID int64) error {
 		return fmt.Errorf("failed to decrypt password: %w", err)
 	}
 
+	// Validate backup has a database name (for new multi-database system)
+	if backup.DatabaseName == "" {
+		return fmt.Errorf("backup does not specify a database name - this may be an old backup format")
+	}
+
 	if _, err := os.Stat(backup.FilePath); os.IsNotExist(err) {
 		return fmt.Errorf("backup file not found: %s", backup.FilePath)
 	}
@@ -66,7 +72,7 @@ func (r *Restorer) RestoreBackup(ctx context.Context, backupID int64) error {
 		Passwd: password,
 		Net:    "tcp",
 		Addr:   fmt.Sprintf("%s:%d", target.Host, target.Port),
-		DBName: target.DBName,
+		DBName: backup.DatabaseName,
 		Params: map[string]string{
 			"charset":         "utf8mb4",
 			"multiStatements": "true",
@@ -81,11 +87,121 @@ func (r *Restorer) RestoreBackup(ctx context.Context, backupID int64) error {
 	}
 	defer db.Close()
 
-	if err := db.PingContext(ctx); err != nil {
+	// Set connection settings to avoid timeouts
+	db.SetConnMaxLifetime(30 * time.Second)
+	db.SetMaxOpenConns(1)
+
+	if err := db.Ping(); err != nil {
 		return fmt.Errorf("failed to ping MySQL: %w", err)
 	}
 
+	// Verify that the target database exists
+	if err := r.verifyDatabaseExists(ctx, db, backup.DatabaseName); err != nil {
+		return fmt.Errorf("database verification failed: %w", err)
+	}
+
 	return r.executeSQLFile(ctx, db, reader)
+}
+
+func (r *Restorer) verifyDatabaseExists(ctx context.Context, db *sql.DB, dbName string) error {
+	var exists bool
+	query := "SELECT EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?)"
+	
+	err := db.QueryRow(query, dbName).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("failed to check if database exists: %w", err)
+	}
+	
+	if !exists {
+		return fmt.Errorf("target database '%s' does not exist - please create it first or enable 'Create database if it doesn't exist' option", dbName)
+	}
+	
+	return nil
+}
+
+// RestoreBackupWithOptions allows restoring with additional options like creating database
+func (r *Restorer) RestoreBackupWithOptions(ctx context.Context, backupID int64, createDatabase bool) error {
+	backup, err := r.repo.GetBackup(backupID)
+	if err != nil {
+		return fmt.Errorf("failed to get backup: %w", err)
+	}
+
+	target, err := r.repo.GetTarget(backup.TargetID)
+	if err != nil {
+		return fmt.Errorf("failed to get target: %w", err)
+	}
+
+	password, err := store.DecryptPassword(target.PasswordEnc)
+	if err != nil {
+		return fmt.Errorf("failed to decrypt password: %w", err)
+	}
+
+	// Validate backup has a database name
+	if backup.DatabaseName == "" {
+		return fmt.Errorf("backup does not specify a database name - this may be an old backup format")
+	}
+
+	if _, err := os.Stat(backup.FilePath); os.IsNotExist(err) {
+		return fmt.Errorf("backup file not found: %s", backup.FilePath)
+	}
+
+	// First connect without specifying database to check/create it
+	if createDatabase {
+		if err := r.ensureDatabaseExists(ctx, target, password, backup.DatabaseName); err != nil {
+			return fmt.Errorf("failed to ensure database exists: %w", err)
+		}
+	}
+
+	// Now proceed with normal restore
+	return r.RestoreBackup(ctx, backupID)
+}
+
+func (r *Restorer) ensureDatabaseExists(ctx context.Context, target *store.Target, password, dbName string) error {
+	// Connect without specifying database
+	cfg := mysql.Config{
+		User:   target.User,
+		Passwd: password,
+		Net:    "tcp",
+		Addr:   fmt.Sprintf("%s:%d", target.Host, target.Port),
+		Params: map[string]string{
+			"charset": "utf8mb4",
+		},
+		ParseTime:            true,
+		AllowNativePasswords: true,
+	}
+
+	db, err := sql.Open("mysql", cfg.FormatDSN())
+	if err != nil {
+		return fmt.Errorf("failed to connect to MySQL: %w", err)
+	}
+	defer db.Close()
+
+	// Set a longer timeout for the connection
+	db.SetConnMaxLifetime(30 * time.Second)
+	db.SetMaxOpenConns(1)
+	
+	if err := db.Ping(); err != nil {
+		return fmt.Errorf("failed to ping MySQL: %w", err)
+	}
+
+	// Check if database exists
+	var exists bool
+	query := "SELECT EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?)"
+	err = db.QueryRow(query, dbName).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("failed to check if database exists: %w", err)
+	}
+
+	// Create database if it doesn't exist
+	if !exists {
+		createQuery := fmt.Sprintf("CREATE DATABASE `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", dbName)
+		_, err = db.Exec(createQuery)
+		if err != nil {
+			return fmt.Errorf("failed to create database '%s': %w", dbName, err)
+		}
+	}
+
+	return nil
 }
 
 func (r *Restorer) executeSQLFile(ctx context.Context, db *sql.DB, reader io.Reader) error {

@@ -20,6 +20,18 @@ export const useBackupsStore = defineStore('backups', () => {
     }
   }
 
+  const fetchAllBackups = async () => {
+    loading.value = true
+    try {
+      backups.value = await backupsApi.getAllBackups()
+    } catch (error) {
+      console.error('Failed to fetch all backups:', error)
+      toastStore.addToast('error', 'Error', 'Failed to load backups')
+    } finally {
+      loading.value = false
+    }
+  }
+
   const downloadBackup = async (id: number): Promise<boolean> => {
     try {
       await backupsApi.download(id)
@@ -64,6 +76,7 @@ export const useBackupsStore = defineStore('backups', () => {
     backups,
     loading,
     fetchBackups,
+    fetchAllBackups,
     downloadBackup,
     restoreBackup,
     deleteBackup

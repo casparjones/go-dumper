@@ -9,7 +9,7 @@ import (
 
 func TestEncryptDecryptPassword(t *testing.T) {
 	// Set up test encryption key
-	testKey := "dGVzdGtleTEyMzQ1Njc4OTBhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5ej0="
+	testKey := "utnQ1VVldc0sA94bFDn3foBgyv5U3gVJsgLcoZB3Bj4="
 	os.Setenv("APP_ENC_KEY", testKey)
 	defer os.Unsetenv("APP_ENC_KEY")
 
@@ -85,7 +85,7 @@ func TestEncryptDecryptPassword(t *testing.T) {
 
 func TestInvalidDecryption(t *testing.T) {
 	// Set up test encryption key
-	testKey := "dGVzdGtleTEyMzQ1Njc4OTBhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5ej0="
+	testKey := "utnQ1VVldc0sA94bFDn3foBgyv5U3gVJsgLcoZB3Bj4="
 	os.Setenv("APP_ENC_KEY", testKey)
 	defer os.Unsetenv("APP_ENC_KEY")
 
@@ -163,7 +163,10 @@ func TestGenerateEncryptionKey(t *testing.T) {
 
 // Helper function to reinitialize encryption for testing
 func initEncryption() {
-	key := getEncryptionKey()
+	key, err := getEncryptionKey()
+	if err != nil {
+		panic(err)
+	}
 	// Reinitialize the global gcm variable
 	// This is a bit hacky but necessary for testing
 	block, err := aes.NewCipher(key)

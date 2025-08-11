@@ -121,18 +121,18 @@
                 </label>
               </td>
               <td>
-                <div class="font-medium text-sm">{{ backup.targetName }}</div>
-                <div class="text-xs text-base-content/70">{{ backup.host }}</div>
+                <div class="font-medium text-sm">{{ backup.target_name }}</div>
+                <div class="text-xs text-base-content/70">{{ backup.host }}:{{ backup.port }}</div>
               </td>
               <td>
-                <div class="font-medium text-sm">{{ backup.database }}</div>
+                <div class="font-medium text-sm">{{ backup.database_name }}</div>
               </td>
               <td>
-                <div class="text-sm">{{ formatDate(backup.created_at) }}</div>
-                <div class="text-xs text-base-content/70">{{ formatTime(backup.created_at) }}</div>
+                <div class="text-sm">{{ formatDate(backup.started_at) }}</div>
+                <div class="text-xs text-base-content/70">{{ formatTime(backup.started_at) }}</div>
               </td>
               <td>
-                <div class="text-sm font-medium">{{ backup.size }}</div>
+                <div class="text-sm font-medium">{{ formatBytes(backup.size_bytes) }}</div>
               </td>
               <td>
                 <div class="flex items-center gap-2">
@@ -242,9 +242,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTargetsStore } from '@/stores/targets'
+import { useBackupsStore } from '@/stores/backups'
 
 const router = useRouter()
 const targetStore = useTargetsStore()
+const backupsStore = useBackupsStore()
 
 // Filters
 const selectedFilter = ref<number | ''>('')
@@ -259,59 +261,8 @@ const selectedBackups = ref<number[]>([])
 const currentPage = ref(1)
 const itemsPerPage = 10
 
-// Mock backup data - in real app this would come from API
-const allBackups = ref([
-  {
-    id: 1,
-    target_id: 1,
-    targetName: 'Production Server',
-    host: 'prod.example.com',
-    database: 'ecommerce_prod',
-    created_at: '2024-01-15T14:30:00Z',
-    size: '2.4 GB',
-    status: 'success'
-  },
-  {
-    id: 2,
-    target_id: 2,
-    targetName: 'Staging Environment',
-    host: 'staging.example.com',
-    database: 'staging_db',
-    created_at: '2024-01-15T02:00:00Z',
-    size: '856 MB',
-    status: 'success'
-  },
-  {
-    id: 3,
-    target_id: 3,
-    targetName: 'Analytics DB',
-    host: 'analytics.example.com',
-    database: 'analytics_main',
-    created_at: '2024-01-14T20:15:00Z',
-    size: '0 B',
-    status: 'failed'
-  },
-  {
-    id: 4,
-    target_id: 1,
-    targetName: 'Production Server',
-    host: 'prod.example.com',
-    database: 'ecommerce_prod',
-    created_at: '2024-01-14T14:30:00Z',
-    size: '2.3 GB',
-    status: 'success'
-  },
-  {
-    id: 5,
-    target_id: 4,
-    targetName: 'Development DB',
-    host: 'dev.example.com',
-    database: 'dev_database',
-    created_at: '2024-01-14T16:45:00Z',
-    size: '124 MB',
-    status: 'success'
-  }
-])
+// Use real backup data from API
+const allBackups = computed(() => backupsStore.backups)
 
 const filteredBackups = computed(() => {
   let filtered = [...allBackups.value]
@@ -341,20 +292,20 @@ const filteredBackups = computed(() => {
         break
     }
     
-    filtered = filtered.filter(b => new Date(b.created_at) >= filterDate)
+    filtered = filtered.filter(b => new Date(b.started_at) >= filterDate)
   }
   
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     filtered = filtered.filter(b => 
-      b.targetName.toLowerCase().includes(query) ||
-      b.database.toLowerCase().includes(query) ||
-      b.host.toLowerCase().includes(query)
+      b.target_name?.toLowerCase().includes(query) ||
+      b.database_name?.toLowerCase().includes(query) ||
+      b.host?.toLowerCase().includes(query)
     )
   }
   
   // Sort by creation date (newest first)
-  filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  filtered.sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())
   
   // Apply pagination
   const startIndex = (currentPage.value - 1) * itemsPerPage
@@ -372,9 +323,9 @@ const totalPages = computed(() => {
     if (statusFilter.value && backup.status !== statusFilter.value) include = false
     if (searchQuery.value) {
       const query = searchQuery.value.toLowerCase()
-      include = backup.targetName.toLowerCase().includes(query) ||
-                backup.database.toLowerCase().includes(query) ||
-                backup.host.toLowerCase().includes(query)
+      include = backup.target_name?.toLowerCase().includes(query) ||
+                backup.database_name?.toLowerCase().includes(query) ||
+                backup.host?.toLowerCase().includes(query)
     }
     
     return include
@@ -408,6 +359,16 @@ const formatTime = (dateString: string): string => {
   return new Date(dateString).toLocaleTimeString()
 }
 
+const formatBytes = (bytes: number): string => {
+  if (bytes === 0) return '0 B'
+  
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
 const toggleSelectAll = () => {
   if (allSelected.value) {
     selectedBackups.value = selectedBackups.value.filter(
@@ -429,13 +390,13 @@ const toggleSelectBackup = (backupId: number) => {
 }
 
 const downloadBackup = async (backupId: number) => {
-  // In real app: call API to download backup
-  console.log('Downloading backup:', backupId)
+  await backupsStore.downloadBackup(backupId)
 }
 
 const downloadSelected = async () => {
-  // In real app: call API to download multiple backups
-  console.log('Downloading selected backups:', selectedBackups.value)
+  for (const backupId of selectedBackups.value) {
+    await backupsStore.downloadBackup(backupId)
+  }
 }
 
 const restoreBackup = (backupId: number) => {
@@ -450,29 +411,32 @@ const viewDetails = (backupId: number) => {
 
 const deleteBackup = async (backupId: number) => {
   if (confirm('Are you sure you want to delete this backup? This action cannot be undone.')) {
-    // In real app: call API to delete backup
-    const index = allBackups.value.findIndex(b => b.id === backupId)
-    if (index > -1) {
-      allBackups.value.splice(index, 1)
-    }
-    
-    // Remove from selection if selected
-    const selIndex = selectedBackups.value.indexOf(backupId)
-    if (selIndex > -1) {
-      selectedBackups.value.splice(selIndex, 1)
+    const success = await backupsStore.deleteBackup(backupId)
+    if (success) {
+      // Remove from selection if selected
+      const selIndex = selectedBackups.value.indexOf(backupId)
+      if (selIndex > -1) {
+        selectedBackups.value.splice(selIndex, 1)
+      }
+      // Refresh the backup list
+      await backupsStore.fetchAllBackups()
     }
   }
 }
 
 const deleteSelected = async () => {
   if (confirm(`Are you sure you want to delete ${selectedBackups.value.length} selected backup(s)? This action cannot be undone.`)) {
-    // In real app: call API to delete multiple backups
-    allBackups.value = allBackups.value.filter(b => !selectedBackups.value.includes(b.id))
+    for (const backupId of selectedBackups.value) {
+      await backupsStore.deleteBackup(backupId)
+    }
     selectedBackups.value = []
+    // Refresh the backup list
+    await backupsStore.fetchAllBackups()
   }
 }
 
-onMounted(() => {
-  targetStore.fetchTargets()
+onMounted(async () => {
+  await targetStore.fetchTargets()
+  await backupsStore.fetchAllBackups()
 })
 </script>

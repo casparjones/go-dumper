@@ -46,10 +46,12 @@ func New(db *sql.DB) *gin.Engine {
 			targets.DELETE("/:id", targetsHandler.DeleteTarget)
 			targets.POST("/:id/backup", targetsHandler.CreateBackup)
 			targets.GET("/:id/backups", targetsHandler.GetTargetBackups)
+			targets.POST("/discover", targetsHandler.DiscoverDatabases)
 		}
 
 		backups := api.Group("/backups")
 		{
+			backups.GET("", backupsHandler.GetAllBackups)
 			backups.GET("/:id/download", backupsHandler.DownloadBackup)
 			backups.POST("/:id/restore", backupsHandler.RestoreBackup)
 			backups.DELETE("/:id", backupsHandler.DeleteBackup)

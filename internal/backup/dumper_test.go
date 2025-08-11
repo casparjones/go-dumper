@@ -148,11 +148,11 @@ func TestWriteHeader(t *testing.T) {
 	var buf strings.Builder
 
 	target := &store.Target{
-		Host:   "localhost",
-		DBName: "testdb",
+		Host: "localhost",
 	}
+	databaseName := "testdb"
 
-	err := d.writeHeader(&buf, target)
+	err := d.writeHeader(&buf, target, databaseName)
 	if err != nil {
 		t.Fatalf("writeHeader failed: %v", err)
 	}
@@ -176,7 +176,7 @@ func TestWriteHeader(t *testing.T) {
 		t.Error("Header missing charset setting")
 	}
 
-	if !strings.Contains(output, "SET FOREIGN_KEY_CHECKS=0") {
+	if !strings.Contains(output, "FOREIGN_KEY_CHECKS=0") {
 		t.Error("Header missing foreign key checks disable")
 	}
 }
