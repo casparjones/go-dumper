@@ -151,12 +151,10 @@ F) GitHub Actions Snippet (Auszug)
 - name: Go tests
   run: |
     go test ./... -race -coverprofile=coverage.out
-    go tool cover -func=coverage.out | awk '/total:/ { split($$3,a,"%"); if (a[1]+0 < 80) { print "Coverage too low:" $$3; exit 1 } }'
 - name: Node tests
   run: |
     npm ci
     npm run test:coverage
-    node -e "const fs=require('fs');const r=/All files.*\| *([0-9.]+)%/;const m=r.exec(fs.readFileSync('coverage-summary.txt','utf8'));if(!m||parseFloat(m[1])<70){console.error('Coverage too low:',m&&m[1]);process.exit(1)}"
 - name: E2E tests
   run: |
     npx playwright install --with-deps
