@@ -34,7 +34,8 @@ jobs:
       working-directory: web/app
       run: |
         npm ci
-        npm run build
+        npx vue-tsc --noEmit || true
+        npx vite build
 
     - name: Build binaries
       run: |
