@@ -6,6 +6,7 @@ package backup
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -21,7 +22,7 @@ import (
 
 func setupIntegrationTest(t *testing.T) (string, *store.Repository, *Dumper, *Restorer) {
 	// Set up test encryption key
-	testKey := "dGVzdGtleTEyMzQ1Njc4OTBhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5ej0="
+	testKey := "p4dwDG2ooMqyDa+irZxpLRTCEBLlBc9tDhetqPjcyEo="
 	os.Setenv("APP_ENC_KEY", testKey)
 	t.Cleanup(func() {
 		os.Unsetenv("APP_ENC_KEY")
@@ -77,8 +78,8 @@ func setupMySQLTarget(t *testing.T, repo *store.Repository) *store.Target {
 		t.Skip("Invalid MySQL DSN, skipping integration test")
 	}
 
-	// Test MySQL connection
-	db, err := sql.Open("mysql", mysqlDSN)
+	// Connect without specifying DB (so we can create it if missing)
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s)/", cfg.User, cfg.Passwd, cfg.Addr))
 	if err != nil {
 		t.Skip("Cannot connect to MySQL, skipping integration test")
 	}
@@ -91,7 +92,21 @@ func setupMySQLTarget(t *testing.T, repo *store.Repository) *store.Target {
 		t.Skip("MySQL not available, skipping integration test")
 	}
 
-	// Create test data
+	// Determine DB name
+	dbName := cfg.DBName
+	if dbName == "" {
+		dbName = "testdb"
+	}
+
+	// Create DB if missing and select it
+	if _, err := db.ExecContext(ctx, "CREATE DATABASE IF NOT EXISTS "+dbName); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "USE "+dbName); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create test data table
 	_, err = db.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS test_users (
 			id INT PRIMARY KEY AUTO_INCREMENT,
@@ -121,18 +136,24 @@ func setupMySQLTarget(t *testing.T, repo *store.Repository) *store.Target {
 		t.Fatal(err)
 	}
 
+	// Prepare SelectedDatabases as JSON array string
+	selectedDatabasesJSON := fmt.Sprintf(`["%s"]`, dbName)
+
+	// Create Target
 	target := &store.Target{
-		Name:          "Test MySQL",
-		Host:          cfg.Addr[:strings.LastIndex(cfg.Addr, ":")],
-		Port:          3306,
-		DBName:        cfg.DBName,
-		User:          cfg.User,
-		PasswordEnc:   encryptedPass,
-		Comment:       "Integration test target",
-		RetentionDays: 7,
-		AutoCompress:  true,
+		Name:              "Test MySQL",
+		Host:              cfg.Addr[:strings.LastIndex(cfg.Addr, ":")],
+		Port:              3306,
+		User:              cfg.User,
+		PasswordEnc:       encryptedPass,
+		Comment:           "Integration test target",
+		RetentionDays:     7,
+		AutoCompress:      true,
+		DatabaseMode:      "selected",            // explicit selection
+		SelectedDatabases: selectedDatabasesJSON, // one DB in JSON array
 	}
 
+	// Adjust host/port if needed
 	if colonIndex := strings.LastIndex(cfg.Addr, ":"); colonIndex >= 0 {
 		target.Host = cfg.Addr[:colonIndex]
 		if portStr := cfg.Addr[colonIndex+1:]; portStr != "" {
@@ -142,8 +163,7 @@ func setupMySQLTarget(t *testing.T, repo *store.Repository) *store.Target {
 		}
 	}
 
-	err = repo.CreateTarget(target)
-	if err != nil {
+	if err := repo.CreateTarget(target); err != nil {
 		t.Fatal(err)
 	}
 
@@ -151,7 +171,7 @@ func setupMySQLTarget(t *testing.T, repo *store.Repository) *store.Target {
 }
 
 func TestIntegrationBackupAndRestore(t *testing.T) {
-	backupDir, repo, dumper, restorer := setupIntegrationTest(t)
+	_, repo, dumper, restorer := setupIntegrationTest(t)
 	target := setupMySQLTarget(t, repo)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -217,23 +237,78 @@ func TestIntegrationLargeDataset(t *testing.T) {
 		t.Skip("Skipping large dataset test in short mode")
 	}
 
-	backupDir, repo, dumper, _ := setupIntegrationTest(t)
+	_, repo, dumper, _ := setupIntegrationTest(t)
 	target := setupMySQLTarget(t, repo)
 
-	// Get MySQL connection to create large dataset
+	// --- DB-Name ermitteln ---
 	password, err := store.DecryptPassword(target.PasswordEnc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cfg := mysql.Config{
-		User:   target.User,
-		Passwd: password,
-		Net:    "tcp",
-		Addr:   fmt.Sprintf("%s:%d", target.Host, target.Port),
-		DBName: target.DBName,
+	dbName := ""
+	// 1) aus SelectedDatabases lesen, falls vorhanden
+	if target.SelectedDatabases != "" {
+		var sel []string
+		if err := json.Unmarshal([]byte(target.SelectedDatabases), &sel); err == nil && len(sel) > 0 {
+			dbName = sel[0]
+		}
 	}
 
+	// 2) sonst per SHOW DATABASES die erste Nicht-System-DB nehmen
+	if dbName == "" {
+		tmpCfg := mysql.Config{
+			User:                 target.User,
+			Passwd:               password,
+			Net:                  "tcp",
+			Addr:                 fmt.Sprintf("%s:%d", target.Host, target.Port),
+			ParseTime:            true,
+			AllowNativePasswords: true,
+		}
+		tmpDB, err := sql.Open("mysql", tmpCfg.FormatDSN())
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tmpDB.Close()
+
+		rows, err := tmpDB.Query("SHOW DATABASES")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+
+		systemDBs := map[string]bool{
+			"information_schema": true,
+			"performance_schema": true,
+			"mysql":              true,
+			"sys":                true,
+		}
+
+		for rows.Next() {
+			var name string
+			if err := rows.Scan(&name); err != nil {
+				t.Fatal(err)
+			}
+			if !systemDBs[name] {
+				dbName = name
+				break
+			}
+		}
+		if dbName == "" {
+			t.Fatal("Keine benutzbare Datenbank gefunden")
+		}
+	}
+
+	// --- Verbindung MIT DB-Namen ---
+	cfg := mysql.Config{
+		User:                 target.User,
+		Passwd:               password,
+		Net:                  "tcp",
+		Addr:                 fmt.Sprintf("%s:%d", target.Host, target.Port),
+		DBName:               dbName, // wichtig!
+		ParseTime:            true,
+		AllowNativePasswords: true,
+	}
 	db, err := sql.Open("mysql", cfg.FormatDSN())
 	if err != nil {
 		t.Fatal(err)
@@ -257,7 +332,6 @@ func TestIntegrationLargeDataset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Insert many rows
 	for i := 0; i < 1000; i++ {
 		_, err = db.ExecContext(ctx, `
 			INSERT INTO large_test_table (data, number_col, date_col) 
@@ -294,14 +368,11 @@ func TestIntegrationLargeDataset(t *testing.T) {
 	t.Logf("Large dataset backup completed. Size: %d bytes", completedBackup.SizeBytes)
 
 	// Clean up
-	_, err = db.ExecContext(ctx, "DROP TABLE large_test_table")
-	if err != nil {
-		t.Logf("Failed to clean up test table: %v", err)
-	}
+	_, _ = db.ExecContext(ctx, "DROP TABLE large_test_table")
 }
 
 func TestIntegrationBackupRotation(t *testing.T) {
-	backupDir, repo, dumper, _ := setupIntegrationTest(t)
+	_, repo, dumper, _ := setupIntegrationTest(t)
 	target := setupMySQLTarget(t, repo)
 
 	// Set very short retention
@@ -331,6 +402,10 @@ func TestIntegrationBackupRotation(t *testing.T) {
 	backup2, err := dumper.CreateBackup(ctx, target.ID)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if backup2.ID == backup1.ID {
+		t.Fatal("failed to create second backup, rotation did not trigger")
 	}
 
 	// Wait for it to complete
