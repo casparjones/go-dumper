@@ -39,7 +39,8 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              Configure
+
+              Database Config
             </router-link>
           </li>
           
@@ -49,6 +50,15 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
               </svg>
               Backup
+            </router-link>
+          </li>
+
+          <li>
+            <router-link to="/schedule-jobs" class="flex items-center gap-3" :class="{ 'active': $route.path === '/schedule-jobs' }">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Schedule Jobs
             </router-link>
           </li>
           
@@ -78,7 +88,18 @@
               Log
             </router-link>
           </li>
-          
+
+          <li>
+            <router-link to="/settings" class="flex items-center gap-3" :class="{ 'active': $route.path === '/settings' }">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+
+              Settings
+            </router-link>
+          </li>
+
           <li>
             <router-link to="/help" class="flex items-center gap-3" :class="{ 'active': $route.path === '/help' }">
               <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -140,6 +161,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useTargetsStore } from '@/stores/targets'
+import { useAppStore } from '@/stores/app'
 
 interface Configuration {
   id: number
@@ -156,9 +178,7 @@ interface Database {
 }
 
 const targetStore = useTargetsStore()
-
-const selectedConfig = ref<number | ''>('')
-const selectedDatabase = ref<string>('')
+const appStore = useAppStore()
 
 const configurations = computed<Configuration[]>(() => {
   return targetStore.targets.map(target => ({
@@ -177,10 +197,22 @@ const databases = ref<Database[]>([
   { name: 'analytics_db', size: '5.7 GB', tables: 89 }
 ])
 
+const selectedConfig = computed({
+  get: () => appStore.selectedConfigId || '',
+  set: (value: number | '') => {
+    appStore.setSelectedConfig(value === '' ? null : value)
+  }
+})
+
+const selectedDatabase = computed({
+  get: () => appStore.selectedDatabase,
+  set: (value: string) => {
+    appStore.setSelectedDatabase(value)
+  }
+})
+
 const onConfigChange = () => {
-  selectedDatabase.value = ''
-  // Here you would typically fetch databases for the selected configuration
-  // For now we'll use dummy data
+  // Database selection is automatically reset in the store
 }
 
 const onDatabaseChange = () => {
@@ -188,7 +220,15 @@ const onDatabaseChange = () => {
   console.log('Selected database:', selectedDatabase.value)
 }
 
-onMounted(() => {
-  targetStore.fetchTargets()
+onMounted(async () => {
+  // Load saved configuration from localStorage
+  appStore.loadSavedConfig()
+  
+  // Load targets and then validate saved configuration
+  await targetStore.fetchTargets()
+  appStore.validateSavedConfig()
+  
+  // Load theme from backend, fallback to system detection
+  await appStore.loadThemeFromBackend()
 })
 </script>

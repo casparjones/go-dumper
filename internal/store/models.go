@@ -47,3 +47,39 @@ const (
 type DatabaseInfo struct {
 	Name string `json:"name"`
 }
+
+type ScheduleJob struct {
+	ID              int64      `json:"id" db:"id"`
+	TargetID        int64      `json:"target_id" db:"target_id"`
+	Name            string     `json:"name" db:"name"`
+	Description     string     `json:"description" db:"description"`
+	IsActive        bool       `json:"is_active" db:"is_active"`
+	ScheduleConfig  string     `json:"schedule_config" db:"schedule_config"`   // JSON with frequency, minutes, hours, etc.
+	BackupOptions   string     `json:"backup_options" db:"backup_options"`     // JSON with compress, databases, etc.
+	MetaConfig      string     `json:"meta_config" db:"meta_config"`           // JSON for future extensions (minio, nextcloud, etc.)
+	LastRunAt       *time.Time `json:"last_run_at" db:"last_run_at"`
+	LastRunStatus   string     `json:"last_run_status" db:"last_run_status"`
+	LastRunNotes    string     `json:"last_run_notes" db:"last_run_notes"`
+	NextRunAt       *time.Time `json:"next_run_at" db:"next_run_at"`
+	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at" db:"updated_at"`
+}
+
+const (
+	JobStatusPending = "pending"
+	JobStatusRunning = "running"
+	JobStatusSuccess = "success"
+	JobStatusFailed  = "failed"
+)
+
+type AppConfig struct {
+	ID        int64     `json:"id" db:"id"`
+	Key       string    `json:"key" db:"key"`
+	Value     string    `json:"value" db:"value"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+}
+
+const (
+	ConfigKeyTheme = "theme"
+)

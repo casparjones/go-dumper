@@ -6,7 +6,15 @@
       "Bash(make:*)",
       "Bash(go build:*)",
       "Bash(go test:*)",
-      "Bash(openssl rand:*)"
+      "Bash(openssl rand:*)",
+      "Bash(npm run test:coverage:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run test:*)",
+      "Bash(export APP_ENC_KEY=N3aRXcbys6L8ElBsT1ST15NMzmyCC4b+j0abQiLz9FM=)",
+      "Bash(go run:*)",
+      "Bash(./bin/go-dumper:*)",
+      "Bash(curl:*)",
+      "Bash(export APP_PORT=8081)"
     ],
     "deny": []
   }

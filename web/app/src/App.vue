@@ -37,4 +37,9 @@
 <script setup lang="ts">
 import Sidebar from '@/components/Sidebar.vue'
 import Toasts from '@/components/Toasts.vue'
+
+let theme = localStorage.getItem('theme')
+let html = document.getElementsByTagName('html')[0];
+html.setAttribute('data-theme', theme || 'light')
+
 </script>

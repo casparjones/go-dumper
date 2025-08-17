@@ -19,6 +19,11 @@ const router = createRouter({
       component: () => import('@/pages/Backup.vue')
     },
     {
+      path: '/schedule-jobs',
+      name: 'ScheduleJobs',
+      component: () => import('@/pages/ScheduleJobs.vue')
+    },
+    {
       path: '/restore',
       name: 'Restore',
       component: () => import('@/pages/Restore.vue')
@@ -37,6 +42,11 @@ const router = createRouter({
       path: '/help',
       name: 'Help',
       component: () => import('@/pages/Help.vue')
+    },
+    {
+      path: '/settings',
+      name: 'Settings',
+      component: () => import('@/pages/Settings.vue')
     },
     // Legacy routes for compatibility
     {
@@ -57,10 +67,6 @@ const router = createRouter({
       path: '/targets/:id/backups',
       name: 'TargetBackups',
       component: () => import('@/pages/Backups.vue')
-    },
-    {
-      path: '/settings',
-      redirect: '/help'
     }
   ]
 })

@@ -46,6 +46,46 @@ FOR EACH ROW
 BEGIN
 	UPDATE targets SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
+
+CREATE TABLE IF NOT EXISTS schedule_jobs (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	target_id INTEGER NOT NULL,
+	name TEXT NOT NULL,
+	description TEXT DEFAULT '',
+	is_active BOOLEAN DEFAULT 1,
+	schedule_config TEXT NOT NULL,
+	backup_options TEXT NOT NULL,
+	meta_config TEXT DEFAULT '{}',
+	last_run_at DATETIME,
+	last_run_status TEXT DEFAULT '',
+	last_run_notes TEXT DEFAULT '',
+	next_run_at DATETIME,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (target_id) REFERENCES targets(id) ON DELETE CASCADE
+);
+
+CREATE TRIGGER IF NOT EXISTS update_schedule_jobs_timestamp 
+AFTER UPDATE ON schedule_jobs
+FOR EACH ROW
+BEGIN
+	UPDATE schedule_jobs SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
+CREATE TABLE IF NOT EXISTS app_config (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	key TEXT NOT NULL UNIQUE,
+	value TEXT NOT NULL,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TRIGGER IF NOT EXISTS update_app_config_timestamp 
+AFTER UPDATE ON app_config
+FOR EACH ROW
+BEGIN
+	UPDATE app_config SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
 `
 
 func InitDB(dbPath string) (*sql.DB, error) {

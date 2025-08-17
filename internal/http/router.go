@@ -29,6 +29,8 @@ func New(db *sql.DB) *gin.Engine {
 
 	targetsHandler := handlers.NewTargetsHandler(repo, dumper)
 	backupsHandler := handlers.NewBackupsHandler(repo, restorer)
+	jobsHandler := handlers.NewJobsHandler(repo, dumper)
+	configHandler := handlers.NewConfigHandler(repo)
 	healthHandler := handlers.NewHealthHandler(db)
 
 	r.GET("/healthz", healthHandler.Healthz)
@@ -55,6 +57,25 @@ func New(db *sql.DB) *gin.Engine {
 			backups.GET("/:id/download", backupsHandler.DownloadBackup)
 			backups.POST("/:id/restore", backupsHandler.RestoreBackup)
 			backups.DELETE("/:id", backupsHandler.DeleteBackup)
+		}
+
+		jobs := api.Group("/jobs")
+		{
+			jobs.GET("", jobsHandler.GetJobs)
+			jobs.POST("", jobsHandler.CreateJob)
+			jobs.GET("/:id", jobsHandler.GetJob)
+			jobs.PUT("/:id", jobsHandler.UpdateJob)
+			jobs.DELETE("/:id", jobsHandler.DeleteJob)
+			jobs.POST("/:id/run", jobsHandler.RunJobNow)
+		}
+
+		config := api.Group("/config")
+		{
+			config.GET("", configHandler.GetAllConfigs)
+			config.POST("", configHandler.SetConfig)
+			config.GET("/:key", configHandler.GetConfig)
+			config.GET("/theme", configHandler.GetTheme)
+			config.POST("/theme", configHandler.SetTheme)
 		}
 	}
 

@@ -116,9 +116,135 @@ export const backupsApi = {
   }
 }
 
+export interface ScheduleJob {
+  id: number
+  target_id: number
+  name: string
+  description: string
+  is_active: boolean
+  schedule_config: string
+  backup_options: string
+  meta_config: string
+  last_run_at?: string
+  last_run_status?: string
+  last_run_notes?: string
+  next_run_at?: string
+  created_at: string
+  updated_at: string
+  target?: Target
+}
+
+export interface CreateJobRequest {
+  target_id: number
+  name: string
+  description?: string
+  schedule_config: {
+    frequency: string
+    minutes?: number[]
+    hours?: number[]
+    weekdays?: number[]
+    days_of_month?: number[]
+    months?: number[]
+  }
+  backup_options: {
+    compress: boolean
+    include_structure: boolean
+    include_data: boolean
+    databases?: string[]
+  }
+  meta_config?: Record<string, any>
+}
+
+export interface UpdateJobRequest {
+  name: string
+  description: string
+  is_active: boolean
+  schedule_config: {
+    frequency: string
+    minutes?: number[]
+    hours?: number[]
+    weekdays?: number[]
+    days_of_month?: number[]
+    months?: number[]
+  }
+  backup_options: {
+    compress: boolean
+    include_structure: boolean
+    include_data: boolean
+    databases?: string[]
+  }
+  meta_config?: Record<string, any>
+}
+
+export const jobsApi = {
+  async getAll(): Promise<ScheduleJob[]> {
+    const response = await api.get<ScheduleJob[]>('/jobs')
+    return response.data
+  },
+
+  async getById(id: number): Promise<ScheduleJob> {
+    const response = await api.get<ScheduleJob>(`/jobs/${id}`)
+    return response.data
+  },
+
+  async create(job: CreateJobRequest): Promise<ScheduleJob> {
+    const response = await api.post<ScheduleJob>('/jobs', job)
+    return response.data
+  },
+
+  async update(id: number, job: UpdateJobRequest): Promise<ScheduleJob> {
+    const response = await api.put<ScheduleJob>(`/jobs/${id}`, job)
+    return response.data
+  },
+
+  async delete(id: number): Promise<void> {
+    await api.delete(`/jobs/${id}`)
+  },
+
+  async runNow(id: number): Promise<{ message: string; job_id: number }> {
+    const response = await api.post(`/jobs/${id}/run`)
+    return response.data
+  }
+}
+
 export const healthApi = {
   async check(): Promise<{ status: string; service: string }> {
     const response = await api.get('/healthz')
+    return response.data
+  }
+}
+
+export interface AppConfig {
+  id: number
+  key: string
+  value: string
+  created_at: string
+  updated_at: string
+}
+
+export const configApi = {
+  async getTheme(): Promise<{ theme: string }> {
+    const response = await api.get('/config/theme')
+    return response.data
+  },
+
+  async setTheme(theme: string): Promise<{ message: string; theme: string }> {
+    const response = await api.post('/config/theme', { theme })
+    return response.data
+  },
+
+  async getConfig(key: string): Promise<AppConfig> {
+    const response = await api.get(`/config/${key}`)
+    return response.data
+  },
+
+  async setConfig(key: string, value: string): Promise<{ message: string }> {
+    const response = await api.post('/config', { key, value })
+    return response.data
+  },
+
+  async getAllConfigs(): Promise<AppConfig[]> {
+    const response = await api.get('/config')
     return response.data
   }
 }

@@ -123,7 +123,7 @@
             <label class="label">
               <span class="label-text">Database Configuration <span class="text-error">*</span></span>
             </label>
-            <div class="space-y-3">
+            <div class="flex flex-col space-y-3">
               <label class="label cursor-pointer justify-start gap-3">
                 <input
                     v-model="form.database_mode"
@@ -192,61 +192,6 @@
             </div>
           </div>
 
-        </div>
-      </div>
-
-      <!-- Backup Settings -->
-      <div class="card bg-base-100 border border-base-200 shadow-sm">
-        <div class="card-body gap-4">
-          <h2 class="card-title">Backup Settings</h2>
-
-          <div class="grid gap-4 md:grid-cols-2">
-            <div class="form-control">
-              <label class="label">
-                <span class="label-text">Schedule (UTC)</span>
-              </label>
-              <input
-                  v-model="form.schedule_time"
-                  type="time"
-                  class="input input-bordered w-full"
-                  placeholder="HH:MM"
-              />
-              <label class="label">
-                <span class="label-text-alt">Leave empty to disable automatic backups</span>
-              </label>
-            </div>
-
-            <div class="form-control">
-              <label class="label">
-                <span class="label-text">Retention Days</span>
-              </label>
-              <input
-                  v-model.number="form.retention_days"
-                  type="number"
-                  placeholder="30"
-                  class="input input-bordered w-full"
-                  min="1"
-                  max="365"
-              />
-              <label class="label">
-                <span class="label-text-alt">How many days to keep backups (default: 30)</span>
-              </label>
-            </div>
-          </div>
-
-          <div class="form-control">
-            <label class="label cursor-pointer justify-between">
-              <span class="label-text">Enable Compression</span>
-              <input
-                  v-model="form.auto_compress"
-                  type="checkbox"
-                  class="toggle toggle-primary"
-              />
-            </label>
-            <label class="label">
-              <span class="label-text-alt">Compress backup files with gzip</span>
-            </label>
-          </div>
         </div>
       </div>
 

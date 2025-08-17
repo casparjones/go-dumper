@@ -180,7 +180,18 @@ func (d *Dumper) performMultipleDatabaseBackup(ctx context.Context, backups []*s
 func (d *Dumper) performSingleDatabaseBackup(ctx context.Context, backup *store.Backup, target *store.Target, password string) {
 	timestamp := backup.StartedAt.Format("2006-01-02_15-04-05")
 	filename := fmt.Sprintf("%s_%s_%s.sql.gz", target.Name, backup.DatabaseName, timestamp)
-	filepath := filepath.Join(d.backupDir, filename)
+	
+	// Create year/month directory structure (YYYY/MM/)
+	yearMonth := backup.StartedAt.Format("2006/01")
+	backupSubDir := filepath.Join(d.backupDir, yearMonth)
+	
+	// Ensure directory exists
+	if err := os.MkdirAll(backupSubDir, 0755); err != nil {
+		d.updateBackupStatus(backup, store.BackupStatusFailed, fmt.Sprintf("Failed to create backup directory: %v", err))
+		return
+	}
+	
+	filepath := filepath.Join(backupSubDir, filename)
 
 	options := &DumpOptions{
 		Target:       target,
@@ -560,7 +571,7 @@ func (d *Dumper) updateBackupStatus(backup *store.Backup, status, notes string) 
 
 func (d *Dumper) cleanupOldBackups(targetID int64, retentionDays int) {
 	if retentionDays <= 0 {
-		return
+		retentionDays = 30 // Default to 30 days if not set
 	}
 
 	cutoff := time.Now().AddDate(0, 0, -retentionDays)
@@ -571,8 +582,62 @@ func (d *Dumper) cleanupOldBackups(targetID int64, retentionDays int) {
 
 	for _, backup := range backups {
 		if backup.StartedAt.Before(cutoff) && backup.FilePath != "" {
-			os.Remove(backup.FilePath)
-			d.repo.DeleteBackup(backup.ID)
+			// Remove the backup file
+			if err := os.Remove(backup.FilePath); err == nil || os.IsNotExist(err) {
+				// Only delete from database if file was successfully removed or doesn't exist
+				d.repo.DeleteBackup(backup.ID)
+			}
 		}
 	}
+	
+	// Also cleanup empty year/month directories
+	d.cleanupEmptyDirectories()
+}
+
+// cleanupEmptyDirectories removes empty year/month directories that are older than retention period
+func (d *Dumper) cleanupEmptyDirectories() {
+	cutoffMonth := time.Now().AddDate(0, 0, -30).Format("2006/01")
+	
+	// Walk through backup directory to find year directories
+	yearPattern := filepath.Join(d.backupDir, "*")
+	yearDirs, err := filepath.Glob(yearPattern)
+	if err != nil {
+		return
+	}
+	
+	for _, yearDir := range yearDirs {
+		// Check if it's a year directory (4 digits)
+		yearName := filepath.Base(yearDir)
+		if len(yearName) != 4 {
+			continue
+		}
+		
+		// Check month directories within each year
+		monthPattern := filepath.Join(yearDir, "*")
+		monthDirs, err := filepath.Glob(monthPattern)
+		if err != nil {
+			continue
+		}
+		
+		for _, monthDir := range monthDirs {
+			monthPath := filepath.Join(yearName, filepath.Base(monthDir))
+			if monthPath < cutoffMonth {
+				// Check if directory is empty
+				if d.isDirEmpty(monthDir) {
+					os.Remove(monthDir)
+				}
+			}
+		}
+		
+		// Remove year directory if it's empty
+		if d.isDirEmpty(yearDir) {
+			os.Remove(yearDir)
+		}
+	}
+}
+
+// isDirEmpty checks if a directory is empty
+func (d *Dumper) isDirEmpty(dirPath string) bool {
+	entries, err := os.ReadDir(dirPath)
+	return err == nil && len(entries) == 0
 }
